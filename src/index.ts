@@ -6,8 +6,14 @@ import { unlinkSync, writeFileSync } from 'fs';
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
+// If ./uploads directory does not exist, create it
+import { existsSync, mkdirSync } from 'fs';
+if (!existsSync('./uploads')) {
+    mkdirSync('./uploads');
+}
+
 // Middleware
-app.use(express.json({limit: '10mb'}));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Basic health check endpoint
