@@ -1,15 +1,13 @@
 import express, { Request, Response, Application } from 'express';
 import { getDefaultPrinter, getPrinters, print } from 'pdf-to-printer';
-import multer from 'multer';
 import 'dotenv/config'
-
-const upload = multer({ dest: 'uploads/' })
+import { unlinkSync, writeFileSync } from 'fs';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.json());
+app.use(express.json({limit: '10mb'}));
 app.use(express.urlencoded({ extended: true }));
 
 // Basic health check endpoint
@@ -41,11 +39,14 @@ app.get('/api/printers', async (req: Request, res: Response) => {
 
 
 
-app.post('/api/print', upload.single('document'), async (req: Request, res: Response) => {
+app.post('/api/print', async (req: Request, res: Response) => {
     try {
+        // Document is base64 encoded string
+        const document = req.body.document;
+        // Save the document to a temporary file
+        const tempFilePath = `uploads/${Date.now()}.pdf`;
+        writeFileSync(tempFilePath, Buffer.from(document, 'base64'));
 
-
-        const document = req.file;
         const printerId = process.env.PRINTER_ID;
 
         if (!document || !printerId) {
@@ -66,12 +67,15 @@ app.post('/api/print', upload.single('document'), async (req: Request, res: Resp
             });
         }
 
-        await print(document.path, {
+        await print(tempFilePath, {
             printer: printerId,
             orientation: orientation,
             paperSize: paperSize,
             scale: 'noscale',
         });
+
+        // Delete the temporary file after printing
+        unlinkSync(tempFilePath);
 
         return res.json({
             message: 'Print job submitted successfully',
