@@ -1,5 +1,5 @@
 import express, { Request, Response, Application } from 'express';
-import { getPrinters, print } from 'pdf-to-printer';
+import { getDefaultPrinter, getPrinters, print } from 'pdf-to-printer';
 import multer from 'multer';
 import 'dotenv/config'
 
@@ -46,15 +46,32 @@ app.post('/api/print', upload.single('document'), async (req: Request, res: Resp
 
 
         const document = req.file;
-        const printId = process.env.PRINTER_ID;
+        const printerId = process.env.PRINTER_ID;
 
-        if (!document || !printId) {
+        if (!document || !printerId) {
             return res.status(400).json({
                 error: 'Missing required field: document or printer ID',
             });
         }
 
-        await print(document.path, { printer: printId });
+        let orientation: 'portrait' | 'landscape' = 'portrait';
+        if (process.env.PRINTER_ORIENTATION === 'landscape') {
+            orientation = 'landscape';
+        }
+
+        const paperSize = process.env.PRINTER_PAPER_SIZE;
+        if (!paperSize) {
+            return res.status(400).json({
+                error: 'Missing required configuration field: paper size',
+            });
+        }
+
+        await print(document.path, {
+            printer: printerId,
+            orientation: orientation,
+            paperSize: paperSize,
+            scale: 'noscale',
+        });
 
         return res.json({
             message: 'Print job submitted successfully',
