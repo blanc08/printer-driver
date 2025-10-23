@@ -1,5 +1,9 @@
 import express, { Request, Response, Application } from 'express';
-import { getPrinters } from 'pdf-to-printer';
+import { getPrinters, print } from 'pdf-to-printer';
+import multer from 'multer';
+import 'dotenv/config'
+
+const upload = multer({ dest: 'uploads/' })
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -18,9 +22,9 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API routes
-app.get('/api/printers', (req: Request, res: Response) => {
+app.get('/api/printers', async (req: Request, res: Response) => {
     try {
-        const printers = getPrinters();
+        const printers = await getPrinters();
 
         res.json({
             message: 'List of available printers',
@@ -37,34 +41,32 @@ app.get('/api/printers', (req: Request, res: Response) => {
 
 
 
-app.post('/api/print', (req: Request, res: Response) => {
-    const { printerId, document } = req.body;
+app.post('/api/print', upload.single('document'), async (req: Request, res: Response) => {
+    try {
 
-    if (!printerId || !document) {
-        return res.status(400).json({
-            error: 'Missing required fields: printerId and document',
+
+        const document = req.file;
+        const printId = process.env.PRINTER_ID;
+
+        if (!document || !printId) {
+            return res.status(400).json({
+                error: 'Missing required field: document or printer ID',
+            });
+        }
+
+        await print(document.path, { printer: printId });
+
+        return res.json({
+            message: 'Print job submitted successfully',
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to submit print job',
         });
     }
-
-    return res.json({
-        message: 'Print job submitted successfully',
-        jobId: Math.random().toString(36).substr(2, 9),
-        printerId,
-        status: 'queued',
-        timestamp: new Date().toISOString(),
-    });
-});
-
-app.get('/api/print-status/:jobId', (req: Request, res: Response) => {
-    const { jobId } = req.params;
-
-    res.json({
-        jobId,
-        status: 'completed',
-        progress: 100,
-        message: 'Print job completed successfully',
-        timestamp: new Date().toISOString(),
-    });
 });
 
 // 404 handler
@@ -91,7 +93,6 @@ app.listen(PORT, () => {
     console.log(`📋 API endpoints:`);
     console.log(`   GET  /api/printers - List available printers`);
     console.log(`   POST /api/print - Submit print job`);
-    console.log(`   GET  /api/print-status/:jobId - Check print job status`);
 });
 
 export default app;
